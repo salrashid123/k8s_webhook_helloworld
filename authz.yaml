@@ -1,0 +1,18 @@
+clusters:
+  - name: my-authz-service
+    cluster:
+      certificate-authority: /var/lib/localkube/certs/webhook_ca.crt
+      server: https://webhook.domain.local:8081/authorize
+
+users:
+  - name: my-api-server
+    user:
+      client-certificate: /var/lib/localkube/certs/webhook_plugin.crt
+      client-key: /var/lib/localkube/certs/webhook_plugin.key
+
+current-context: webhook
+contexts:
+- context:
+    cluster: my-authz-service
+    user: my-api-sever
+  name: webhook
