@@ -1,15 +1,15 @@
 # Kubernetes WebHook Authentication/Authorization Minikube HelloWorld
 
 
-Sample minimal HelloWorld application for Miikube demonstrating [Kubernetes Authentication/Authorizaiton](https://kubernetes.io/docs/admin/kubelet-authentication-authorization/) using Webhooks.
+Sample minimal HelloWorld application for Miikube demonstrating [Kubernetes Authentication/Authorization](https://kubernetes.io/docs/admin/kubelet-authentication-authorization/) using Webhooks.
 
 Webhooks proivde a mechanism for delegating k8s AU/AZ decisions.  In the case here, both policy decisions
 are delegated to an _external_ HTTP REST service.  For more information on WebHooks:
 
 - [WebHook Authentication](https://kubernetes.io/docs/admin/authentication/#webhook-token-authentication)
-- [WebHook Authorizaiton](https://kubernetes.io/docs/admin/authorization/webhook/)
+- [WebHook Authorization](https://kubernetes.io/docs/admin/authorization/webhook/)
 
-This repo is designed to run locally with minikube while the WebHook server may run locally or remotely as a separte
+This repo is designed to run locally with minikube while the WebHook server may run locally or remotely as a separate
 python Flask applicaton.  The steps detailed below are lengthy and involve copying certificates into your minikube' persistent
 volume and running your webhook server.
 
@@ -42,7 +42,7 @@ git clone salrashid123/k8s_webook_helloworld
 Minikube needs to know the authn/authz config files and CA webhook_plugin certs to trust but those need to be accesible
 while minikube is started.  That is, the config, certs and key needs to exist within the minikube VM while its starting up.
 The easiest way to do this is to use [host mount folder](https://github.com/kubernetes/minikube/blob/master/docs/host_folder_mount.md) 
-and reference the files on startupthat. However, not all minikube drivers support mount folders 
+and reference the files on startup. However, not all minikube drivers support mount folders 
 (as was the case for me; i used ```-vm-driver kvm2```.   One workaround employed for ```kvm2``` 
 (and described in the appendix), is to first start minikube, then create the certificate files in a peristent volume
 folder (eg [/var/lib/localkube/](https://kubernetes.io/docs/getting-started-guides/minikube/#persistent-volumes)
@@ -210,7 +210,7 @@ You can change the CN and SAN specifications as well as define your own custom C
 
 ### Restart Minikube with webhook
 
-Now Restart Minikube with the webhook configuraitons
+Now Restart Minikube with the webhook configurations
 
 ```bash
 $ minikube start --extra-config apiserver.Authentication.WebHook.ConfigFile=/var/lib/localkube/authn.yaml \
@@ -413,7 +413,7 @@ Either way, you should see the Authentication and Authorization requests in the 
 ## Appendix
 
 The following section is optional and details how you can override the certificates to create
-your own CA and populae the server's certificate with a CN and SAN of your choosing:
+your own CA and populate the server's certificate with a CN and SAN of your choosing:
 
 ### Create webhook server certificates
 
@@ -490,7 +490,7 @@ openssl ca -config openssl.cnf -days 365 -notext  -in webhook_plugin.csr   -out 
 
 You can also use an IP address as the endpoint if you do not have an external DNS server available.
 
-To use an IP instead, change the SAN value to innclude it and regenerate the server.crt/key
+To use an IP instead, change the SAN value to include it and regenerate the server.crt/key
 
 edit CA/openssl.cnf and add IP.1 value
 ```
