@@ -9,8 +9,8 @@ are delegated to an _external_ HTTP REST service.  For more information on WebHo
 - [WebHook Authentication](https://kubernetes.io/docs/admin/authentication/#webhook-token-authentication)
 - [WebHook Authorization](https://kubernetes.io/docs/admin/authorization/webhook/)
 
-This repo is designed to run locally with minikube while the WebHook server may run locally or remotely as a separate
-python Flask applicaton.  The steps detailed below are lengthy and involve copying certificates into your minikube' persistent
+This repo is designed to run onlocally with minikube while the WebHook server may run locally or remotely as a separate
+python Flask applicaton (eg Appengine).  The steps detailed below are lengthy and involve copying certificates into your minikube' persistent
 volume and running your webhook server.
 
 You can deploy the AuthN/AuthZ server as a service within the k8s cluster and provide the Cluster DNS entry reference to it from the
@@ -20,14 +20,6 @@ webhook configuration files.  More information about that configuration in the a
 
 ---
 
-## Prerequsites
-
-### Install python openssl
-```
-$ sudo apt-get update
-$ sudo apt-get install python-pip openssl -y
-$ sudo pip install virtualenv
-```
 
 ## Installation
 
@@ -36,6 +28,42 @@ $ sudo pip install virtualenv
 ```
 git clone salrashid123/k8s_webook_helloworld
 ```
+
+### Deploy WebHook Server
+
+It is **MUCH** easier to deploy your webhook server to AppEngine than to run locally.  The latter requires you to play some
+games with the ```/etc/hosts``` file for name resolution and to match the SAN values within the server certificate.  Running 
+the webhook server locally is described in the Appendix.
+
+
+#### Deploy to Google Appengine
+
+Set up a google cloud platform project and enable AppeEngine
+
+```
+sudo apt-get update
+sudo apt-get install python-pip openssl -y
+sudo pip install virtualenv
+
+cd k8s_webhook_helloworld/server
+
+pip install -t lib -r requirements.txt
+```
+
+now deploy the webhook server:
+
+```
+gcloud app deploy --version 1 --no-promote
+```
+
+At this point, your Webhook server should be accessible at:
+
+```
+gcloud config  get-value core/project
+
+curl https://1-dot-webhook-dot-YOUR_PROJECT.appspot.com/
+```
+
 
 ### Prepare Minikube configuration for Webhook
 
@@ -58,52 +86,42 @@ $ minikube ssh
 $ sudo su -
 ```
 
-### Find External interface IP address for your workstation
-
-On your *workstation*, find its external interface's IP address
-
-```
-/sbin/ifconfig -a
-wlan0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
-        inet 10.17.134.45  netmask 255.255.224.0  broadcast 10.17.159.255
-```
-
-In the example above, the ip is ```10.17.134.45```
-
-### Set host alias within minikube VM
-
-While within the *minikube VM*   ```/etc/hosts``` file and add:
-```
-$ more /etc/hosts
-127.0.0.1       localhost
-127.0.1.1       minikube
-10.17.134.45 webhook.domain.local
-```
-
-Minikube uses the host interface so this way, minkube can find the webhook server running on the workstation
-
-> Note: you may have to reset the IP address within minikube's VM across restarts since the ```/etc/hosts``` value get overridden
-
 
 #### Specify authn/authz definitions
 
-Create the following files with the values shown below:
+Create the following files with the values shown below and download the certificats.
+
+
+For convenience, the default template files are provided here
+```bash
+curl -s  https://raw.githubusercontent.com/salrashid123/k8s_webhook_helloworld/master/authn.yaml -o /var/lib/localkube/authn.yaml
+curl -s  https://raw.githubusercontent.com/salrashid123/k8s_webhook_helloworld/master/authz.yaml -o /var/lib/localkube/authz.yaml
+curl -s  https://raw.githubusercontent.com/salrashid123/k8s_webhook_helloworld/master/CA/GAE_CA.pem -o /var/lib/localkube/certs/webhook_ca.crt
+curl -s  https://raw.githubusercontent.com/salrashid123/k8s_webhook_helloworld/master/CA/webhook_plugin.crt -o /var/lib/localkube/certs/webhook_plugin.crt
+curl -s  https://raw.githubusercontent.com/salrashid123/k8s_webhook_helloworld/master/CA/webhook_plugin.key -o /var/lib/localkube/certs/webhook_plugin.key
+```
+
+Note, we are downloading ```GAE_CA.pem``` as the trusted CA.  You can find those values for the CA here:
+```
+nslookup 1-dot-webhook-dot-YOUR_PROJECT.appspot.com
+
+echo | openssl s_client -showcerts -servername 1-dot-webhook-dot-YOUR_PROJECT.appspot.com -connect 172.217.6.84:443 2>/dev/null
+```
+
+
+Edit the following files while within minikube
 
 * /var/lib/localkube/authn.yaml
 * /var/lib/localkube/authz.yaml
 
 
-If you don't mind using the default hostname and certificates provided, run the following while in minikube:
+Change the ```server:``` line to match your deployed GAE server: 
+(ofcourse substitute YOUR_PROJECT with the value for your GCP project)
 
-```bash
-curl -s  https://raw.githubusercontent.com/salrashid123/k8s_webook_helloworld/master/authn.yaml -o /var/lib/localkube/authn.yaml
-curl -s  https://raw.githubusercontent.com/salrashid123/k8s_webook_helloworld/master/authz.yaml -o /var/lib/localkube/authz.yaml
-curl -s  https://raw.githubusercontent.com/salrashid123/k8s_webook_helloworld/master/CA/CA_crt.pem -o /var/lib/localkube/certs/webhook_ca.crt
-curl -s  https://raw.githubusercontent.com/salrashid123/k8s_webook_helloworld/master/CA/webhook_plugin.crt -o /var/lib/localkube/certs/webhook_plugin.crt
-curl -s  https://raw.githubusercontent.com/salrashid123/k8s_webook_helloworld/master/CA/webhook_plugin.key -o /var/lib/localkube/certs/webhook_plugin.key
+My project is ```mineral-minutia-820``` so I will use:
 ```
-
-and skip to the "Stop Minikube" section below, otherwise:
+server: https://1-dot-webhook-dot-mineral-minutia-820.appspot.com/authenticate
+```
 
 - authn.yaml 
 
@@ -112,7 +130,7 @@ clusters:
   - name: my-authn-service
     cluster:
       certificate-authority: /var/lib/localkube/certs/webhook_ca.crt
-      server: https://webhook.domain.local:8081/authenticate
+      server: https://1-dot-webhook-dot-YOUR_PROJECT.appspot.com/authenticate
 
 users:
   - name: my-api-server
@@ -134,7 +152,7 @@ clusters:
   - name: my-authz-service
     cluster:
       certificate-authority: /var/lib/localkube/certs/webhook_ca.crt
-      server: https://webhook.domain.local:8081/authorize
+      server: https://1-dot-webhook-dot-YOUR_PROJECT.appspot.com/authorize
 
 users:
   - name: my-api-server
@@ -150,21 +168,6 @@ contexts:
   name: webhook
 ```
 
-#### Specify CA trust certificate and plugin certs
-
->> __NOTE__: specifying the CA and certficates here properly is critical!
-
-Create the following files:
-
-* /var/lib/localkube/certs/webhook_ca.crt
-  * default: [webhook_ca.crt](CA/CA_crt.pem)
-* /var/lib/localkube/certs/webhook_plugin.crt
-  * default: [webhook_plugin.crt](CA/webhook_plugin.crt)
-* /var/lib/localkube/certs/webhook_plugin.key
-  * default: [webhook_plugin.key](CA/webhook_plugin.key)
-
-You can use the default files provided in this repo
-
 #### Stop Minikube
 
 ```
@@ -172,40 +175,6 @@ minikube stop
 ```
 
 Since the config and cert files are saved under ```/var/lib/localkube/```, they will remain after minikube restarts
-
-
-## Start Webhook Server and Minikube
-
-
-### Start WebHook Server
-
-Now run the webhook server:
-
-```
-cd server
-virtualenv env
-source env/bin/activate
-pip install -r requirements
-```
-
-Copy the certificates generated
-```
-cp ../CA/server.crt .
-cp ../CA/server.key .
-```
-
-Start the server:
-```
-python webhook.py
-```
-
-The default certificates for the webhook server in this git repo uses
-
-- CN: ```CN=webhook.domain.local``` 
-
-- SAN: ```X509v3 Subject Alternative Name:  DNS: webhook.domain.local```
-
-You can change the CN and SAN specifications as well as define your own custom CA.  Instructions for that can be found in the Appendix.
 
 
 ### Restart Minikube with webhook
@@ -224,10 +193,8 @@ Make sure you can connect from the VM to the webhook server by name:
 ```
 minikube ssh
 
-curl -vk https://webhook.domain.com:8081/
+curl -vk https://1-dot-webhook-dot-YOUR_PROJECT.appspot.com/
 ```
-
-If that does not succeed, check if ```/etc/hosts``` file within the VM is set to the external IP address of your workstation
 
 ### Verify Webhook callback
 
@@ -258,6 +225,10 @@ curl -vk \
 All endpoints are authorized for the token above.  The only endpoint that isn't is ```/api/pods```
 
 The token above can be anything becuase the sample Webhook approves all requests for ```/authenticate``` and ```/authorize```
+
+You can verify by inspecting the logs on AppEngine:
+
+![alt text](images/gae_auth_logs.png)
 
 ### Calling k8s with kubectl
 
@@ -316,8 +287,6 @@ $ kubectl get no
 NAME       STATUS    ROLES     AGE       VERSION
 minikube   Ready     <none>    2d        v1.9.0
 ```
-
-### Verify 
 
 Either way, you should see the Authentication and Authorization requests in the window where your webhook server is running:
 
@@ -521,6 +490,114 @@ print encoded
 decoded = jwt.decode(encoded, 'secret', algorithms=['HS256'])
 print decoded
 ```
+
+
+### Running WebHook locally
+
+As mentioned, getting the webhook server running locally is a bit challenging since minikube needs to connect to the local server and match
+the CN=, SAN values. 
+
+If you would like to attempt this:
+
+#### Find External interface IP address for your workstation
+
+On your *workstation*, find its external interface's IP address
+
+```
+/sbin/ifconfig -a
+wlan0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet 10.17.134.45  netmask 255.255.224.0  broadcast 10.17.159.255
+```
+
+In the example above, the ip is ```10.17.134.45```
+
+Minikube uses the host interface so using this, minkube can find the webhook server running on the workstation
+
+
+#### Specify CA trust certificate and plugin certs
+
+>> __NOTE__: specifying the CA and certficates here properly is critical!
+
+Create the following files:
+
+* /var/lib/localkube/certs/webhook_ca.crt
+  * default: [webhook_ca.crt](CA/CA_crt.pem)
+* /var/lib/localkube/certs/webhook_plugin.crt
+  * default: [webhook_plugin.crt](CA/webhook_plugin.crt)
+* /var/lib/localkube/certs/webhook_plugin.key
+  * default: [webhook_plugin.key](CA/webhook_plugin.key)
+
+
+
+You can use the default files provided in this repo
+
+```bash
+curl -s  https://raw.githubusercontent.com/salrashid123/k8s_webhook_helloworld/master/authn.yaml -o /var/lib/localkube/authn.yaml
+curl -s  https://raw.githubusercontent.com/salrashid123/k8s_webhook_helloworld/master/authz.yaml -o /var/lib/localkube/authz.yaml
+curl -s  https://raw.githubusercontent.com/salrashid123/k8s_webhook_helloworld/master/CA/CA_crt.pem -o /var/lib/localkube/certs/webhook_ca.crt
+curl -s  https://raw.githubusercontent.com/salrashid123/k8s_webhook_helloworld/master/CA/webhook_plugin.crt -o /var/lib/localkube/certs/webhook_plugin.crt
+curl -s  https://raw.githubusercontent.com/salrashid123/k8s_webhook_helloworld/master/CA/webhook_plugin.key -o /var/lib/localkube/certs/webhook_plugin.key
+```
+
+Note  the CA_crt.pem that is downloaded in the step above is for the self-signed CA included in this repo
+
+#### Stop Minikube 
+
+```
+minikube stop
+```
+
+#### Restart minikube specifying WebHook
+
+```bash
+$ minikube start --extra-config apiserver.Authentication.WebHook.ConfigFile=/var/lib/localkube/authn.yaml \
+    --extra-config apiserver.Authorization.Mode=Webhook \
+    --extra-config apiserver.Authorization.WebhookConfigFile=/var/lib/localkube/authz.yaml
+```
+
+#### Start WebHook Server
+
+Now run the webhook server:
+
+```
+cd server
+virtualenv env
+source env/bin/activate
+pip install -r requirements
+```
+
+Start the server:
+```
+python webhook.py
+```
+
+The default certificates for the webhook server in this git repo uses
+
+- CN: ```CN=webhook.domain.local``` 
+
+- SAN: ```X509v3 Subject Alternative Name:  DNS: webhook.domain.local```
+
+You can change the CN and SAN specifications as well as define your own custom CA.  Instructions for that can be found in the Appendix.
+
+#### SSH to minikube and set the hosts file
+```
+minikube ssh
+
+sudo su -
+
+vi /etc/hosts
+
+10.17.134.45  webhook.domain.local
+```
+(the value ```10.17.134.45``` will be different for you and is the public IP we acquired earlier)
+
+#### Verify minikube->local webhook connectivity
+
+Check if you have local connectivity
+```
+curl -vk https://webhook.domain.local:8081/
+```
+If that works, you're all set to run minikube w/ webhook locally
 
 ## Troubleshooting
 
