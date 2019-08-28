@@ -26,7 +26,7 @@ webhook configuration files.  More information about that configuration in the a
 ### Clone the repository
 
 ```
-git clone salrashid123/k8s_webook_helloworld
+git clone https://github.com/salrashid123/k8s_webhook_helloworld
 ```
 
 ### Deploy WebHook Server
