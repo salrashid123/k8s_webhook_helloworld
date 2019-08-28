@@ -1,15 +1,15 @@
 # Kubernetes WebHook Authentication/Authorization Minikube HelloWorld
 
 
-Sample minimal HelloWorld application for Miikube demonstrating [Kubernetes Authentication/Authorization](https://kubernetes.io/docs/admin/kubelet-authentication-authorization/) using Webhooks.
+Sample minimal HelloWorld application for Minikube demonstrating [Kubernetes Authentication/Authorization](https://kubernetes.io/docs/admin/kubelet-authentication-authorization/) using Webhooks.
 
-Webhooks proivde a mechanism for delegating k8s AU/AZ decisions.  In the case here, both policy decisions
+Webhooks provide a mechanism for delegating k8s AU/AZ decisions.  In the case here, both policy decisions
 are delegated to an _external_ HTTP REST service.  For more information on WebHooks:
 
 - [WebHook Authentication](https://kubernetes.io/docs/admin/authentication/#webhook-token-authentication)
 - [WebHook Authorization](https://kubernetes.io/docs/admin/authorization/webhook/)
 
-This repo is designed to run onlocally with minikube while the WebHook server may run locally or remotely as a separate
+This repo is designed to run locally with minikube while the WebHook server may run locally or remotely as a separate
 python Flask applicaton (eg Appengine).  The steps detailed below are lengthy and involve copying certificates into your minikube' persistent
 volume and running your webhook server.
 
