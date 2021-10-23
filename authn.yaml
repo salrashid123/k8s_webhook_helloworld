@@ -1,15 +1,17 @@
+apiVersion: v1
+kind: Config
 clusters:
   - name: my-authn-service
     cluster:
-      certificate-authority: /var/lib/localkube/certs/webhook_ca.crt
-      server: https://webhook.domain.local:8081/authenticate
+      certificate-authority: /var/lib/minikube/certs/gcp_roots.pem
+      server: https://webhook-dot-mineral-minutia-820.appspot.com/authenticate
 
 users:
   - name: my-api-server
     user:
-      client-certificate: /var/lib/localkube/certs/webhook_plugin.crt
-      client-key: /var/lib/localkube/certs/webhook_plugin.key
-
+      # token: test-token
+      client-certificate: /var/lib/minikube/certs/webhook_plugin.crt
+      client-key: /var/lib/minikube/certs/webhook_plugin.key
 current-context: webhook
 contexts:
 - context:

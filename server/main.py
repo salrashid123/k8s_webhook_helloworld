@@ -23,7 +23,7 @@ def Default():
 def Authenticate():
     print('Requesting Authn' )
     parsed = json.loads(request.data)
-    print json.dumps(parsed, indent=4, sort_keys=True)
+    print(json.dumps(parsed, indent=4, sort_keys=True))
     token = parsed['spec']['token']
     
     resp = Response()
@@ -70,7 +70,7 @@ def Authenticate():
 def Authorize():
     print('Requesting Authz' )
     parsed = json.loads(request.data)
-    print json.dumps(parsed, indent=4, sort_keys=True)
+    print(json.dumps(parsed, indent=4, sort_keys=True))
     
     # set some simple rules:
     # allow everyone except user1@domain.com when listing pods
@@ -78,9 +78,9 @@ def Authorize():
     user = parsed['spec']['user']
     
     try:
-      path = parsed['spec']['resourceAttributes']['path']
-      print path
-      if (user == 'user1@domain.com' and path == '/api/pods'):
+      resource = parsed['spec']['resourceAttributes']['resource']
+      print(resource)
+      if (user == 'user1@domain.com' and resource == 'pods'):
         allowed = False
     except KeyError:
       pass
@@ -98,5 +98,6 @@ def Authorize():
     return jsonify(r)
 
 if __name__ == '__main__':
-    context = ('server.crt','server.key')
-    app.run(host='0.0.0.0', port=8081, debug=True,  threaded=True, ssl_context=context)
+    #context = ('server.crt','server.key')
+    #app.run(host='0.0.0.0', port=8081, debug=True,  threaded=True, ssl_context=context)
+    app.run(host='0.0.0.0', port=8080, debug=True)

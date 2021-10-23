@@ -1,2 +1,0 @@
-V	190321045623Z		53	unknown	/C=US/ST=California/O=Google/OU=Enterprise/CN=webhook.domain.local
-V	190321045723Z		54	unknown	/C=US/ST=California/O=Google/OU=Enterprise/CN=webhook_plugin.default.cluster.local

@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp-deployment
+  labels:
+    type: myapp-deployment-label
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      type: myapp
+  template:
+    metadata:
+      labels:
+        type: myapp
+        tier: frontend
+        version: v1
+    spec:
+      containers:
+      - name: frontend
+        image: debian
+        args:
+        - sleep
+        - "1000000"
