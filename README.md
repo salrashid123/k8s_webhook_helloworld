@@ -4,18 +4,22 @@
 Sample minimal HelloWorld application for Minikube demonstrating [Kubernetes Authentication/Authorization](https://kubernetes.io/docs/admin/kubelet-authentication-authorization/) using Webhooks.
 
 Webhooks provide a mechanism for delegating k8s AU/AZ decisions.  In the case here, both policy decisions
-are delegated to an _external_ HTTP REST service which i happened to run on Appengine for simplicity.  For more information on WebHooks:
+are delegated to an _external_ HTTP REST service which you can test by running locally boomeranged through ngrok.  For more information on WebHooks:
 
 - [WebHook Authentication](https://kubernetes.io/docs/admin/authentication/#webhook-token-authentication)
 - [WebHook Authorization](https://kubernetes.io/docs/admin/authorization/webhook/)
 
-You can deploy the AuthN/AuthZ server as a service within the k8s cluster and provide the Cluster DNS entry reference to it from the
-webhook configuration files.  More information about that configuration in the appendix.
+Wait, why is ngrok involved here?  I thought you said it was all local with minikube?
 
-> __Note__: This is just a sample helloworld app.  Do not use this in production!
+Yeah, i know, i just didn't  know how to make minikube call a url on the host system directly (the host meaning the laptop).
 
+so this is where this becomes lazy and crap:  i make minikube/k8s call an "external" api server with a public ngrok url.  That url is basically a tunnel back to the laptop...
 
-...its also very old...there are much better examples around..i'd suggest following something lik
+think of it as a boomerang.   If any reader can tell me how to make minikube talk to the local host/system/laptop, let me know
+
+> __Note__: This is just a sample helloworld app; just a demo
+
+besides, its also very old...there are much better examples around..i'd suggest following something lik
 
 * [Kubernetes authentication/authorization webhook using golang in minikube](https://github.com/dinumathai/auth-webhook-sample#)
 - [https://github.com/pasientskyhosting/kubernetes-authserver](https://github.com/pasientskyhosting/kubernetes-authserver)
@@ -33,44 +37,80 @@ i know, silly and arbitrary.
 
 ## Installation
 
+You can either `A)` deploy the external authn/authz server locally with `ngrok`
+
 ### Clone the repository
 
-```
+```bash
 git clone https://github.com/salrashid123/k8s_webhook_helloworld
 ```
 
-### Deploy WebHook Server
 
-It is **MUCH** easier to deploy your webhook server to AppEngine than to run locally.  The latter requires you to play some
-games with the ```/etc/hosts``` file for name resolution and to match the SAN values within the server certificate.  Running 
-the webhook server locally is described in the Appendix.
+### Deploy with ngrok
 
+You can test this locally to if you use a external proxy like [ngrok](https://ngrok.com/).
 
-#### Deploy to Google Appengine
-
-Set up a google cloud platform project and enable AppeEngine
+1. Download ngrok and run a default http proxy
 
 ```bash
-cd k8s_webhook_helloworld/server
+./ngrok http -host-header=rewrite  localhost:8080
+```
+  
+  This will assign a random url for you to use for 2hours (the free edition)
 
-pip install -t lib -r requirements.txt
+  In my case it was `https://2723-72-83-67-174.ngrok.io`:
+
+  ![images/ngrok_url.png](images/ngrok_url.png)
+
+  you can view the traffic by going to [http://localhost:4040/inspect/http](http://localhost:4040/inspect/http)
+
+2. Set `authn.yaml`, `authz.yaml` to use ngrok
+
+  Edit the two files and set the url appropriately
+
+* `authn.yaml`
+
+```yaml
+apiVersion: v1
+kind: Config
+clusters:
+  - name: my-authn-service
+    cluster:
+      server: https://2723-72-83-67-174.ngrok.io/authenticate
+users:
+  - name: my-api-server
+    user:
+      token: test-token
+current-context: webhook
+contexts:
+- context:
+    cluster: my-authn-service
+    user: my-api-sever
+  name: webhook
 ```
 
-now deploy the webhook server:
+* `authz.yaml`
 
+```yaml
+apiVersion: v1
+kind: Config
+clusters:
+  - name: my-authz-service
+    cluster:
+      server: https://2723-72-83-67-174.ngrok.io/authorize      
+users:
+  - name: my-api-server
+    user:
+      token: test-token
+current-context: webhook
+contexts:
+- context:
+    cluster: my-authz-service
+    user: my-api-sever
+  name: webhook
 ```
-gcloud app deploy --version 1 --no-promote
-```
 
-At this point, your Webhook server should be accessible at:
-
-```
-gcloud config  get-value core/project
-
-curl https://1-dot-webhook-dot-YOUR_PROJECT.appspot.com/
-```
-
-### Specify authn/authz definitions
+#### Specify authn/authz definitions
 
 Edit the following files and enter in your `PROJECT_ID`.  
 
@@ -91,9 +131,7 @@ clusters:
 users:
   - name: my-api-server
     user:
-      # token: test-token
-      client-certificate: /var/lib/minikube/certs/webhook_plugin.crt
-      client-key: /var/lib/minikube/certs/webhook_plugin.key
+      token: test-token
 current-context: webhook
 contexts:
 - context:
@@ -114,9 +152,7 @@ clusters:
 users:
   - name: my-api-server
     user:
-      # token: test-token
-      client-certificate: /var/lib/minikube/certs/webhook_plugin.crt
-      client-key: /var/lib/minikube/certs/webhook_plugin.key
+      token: test-token
 current-context: webhook
 contexts:
 - context:
@@ -125,17 +161,7 @@ contexts:
   name: webhook
 ```
 
-### Prepare Minikube configuration for Webhook
-
-Minikube needs to know the authn/authz config files and CA webhook_plugin certs to trust but those need to be accessible
-while minikube is started.  That is, the config, certs and key needs to exist within the minikube VM while its starting up.
-The easiest way to do this is to copy the files over to minikube's mapped directory `$HOME/.minikube/files/var/lib/minikube/certs/`.
-
-
-#### Start Minikube with custom configuration
-
-https://github.com/dinumathai/auth-webhook-sample#deploy-in-minikube
-
+### Start Minikube with custom configuration
 
 ```bash
 minikube stop
@@ -148,15 +174,15 @@ cp authn.yaml $HOME/.minikube/files/var/lib/minikube/certs/auth
 cp authz.yaml $HOME/.minikube/files/var/lib/minikube/certs/auth
 
 cp gcp_roots.pem $HOME/.minikube/files/var/lib/minikube/certs/gcp_roots.pem
-cp webhook_ca.crt $HOME/.minikube/files/var/lib/minikube/certs/webhook_ca.crt
-cp webhook_plugin.crt $HOME/.minikube/files/var/lib/minikube/certs/webhook_plugin.crt
-cp webhook_plugin.key $HOME/.minikube/files/var/lib/minikube/certs/webhook_plugin.key
+cp certs/webhook_ca.crt $HOME/.minikube/files/var/lib/minikube/certs/webhook_ca.crt
 
 minikube start --driver=kvm2 --embed-certs \
    --extra-config apiserver.authorization-mode=RBAC,Webhook \
    --extra-config apiserver.authentication-token-webhook-config-file=/var/lib/minikube/certs/auth/authn.yaml \
    --extra-config apiserver.authorization-webhook-config-file=/var/lib/minikube/certs/auth/authz.yaml
 ```
+
+(i used `--driver=kvm2`, you can certainly use whatever you want)
 
 ### Verify Webhook callback
 
@@ -216,8 +242,6 @@ The above bearer JWT is in the form:
 }
 ```
 
-![alt text](images/gae_auth_logs.png)
-
 As user2 to see pods
 ```bash
 curl -sk \
@@ -233,6 +257,22 @@ curl -sk \
   "items": []
 }
 ```
+
+If you are using the `ngrok` console, you will see 
+
+* authenticate:
+
+![images/authenticate.png](images/authenticate.png)
+
+
+* deny:
+
+![images/authorize_deny.png](images/authorize_deny.png)
+
+
+* allow:
+
+![images/authorize_allow.png](images/authorize_allow.png)
 ### Calling k8s with kubectl
 
 If you want to use kubectl, you need to configure a context that will use either a  token or basic auth:
@@ -391,8 +431,6 @@ Either way, you should see the Authentication and Authorization requests in the 
     }
 }
 ```
-
-
 ## Appendix
 
 ### Creating new users
@@ -406,4 +444,46 @@ print encoded
 
 decoded = jwt.decode(encoded, 'secret', algorithms=['HS256'])
 print decoded
+```
+
+### Testing using mTLS
+
+This is much harder and i've left this out and i've yet to get it to work
+
+The authn and authz configurations _should_ allow mtls from the api server to the external webhook server (i think)
+
+Unfortunately, i haven't gotten it to work yet..you're welcome to try, i think it involves enabling following flags
+
+* mTLS:
+
+```yaml
+      client-certificate: /var/lib/minikube/certs/webhook_plugin.crt
+      client-key: /var/lib/minikube/certs/webhook_plugin.key
+```
+
+When you configure minikube, copy these certs in
+
+```bash
+cp certs/webhook_plugin.crt $HOME/.minikube/files/var/lib/minikube/certs/webhook_plugin.crt
+cp certs/webhook_plugin.key $HOME/.minikube/files/var/lib/minikube/certs/webhook_plugin.key
+```
+
+and in `main.py`.  Note the server certificate i specified there for TLS is `webhook.esodemoapp2.com` which resolves to an IP I (it wont work for you unless you do a lot of tricks with DNS and minikube)
+
+```python
+if __name__ == '__main__':
+    context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+    context.verify_mode = ssl.CERT_REQUIRED
+    context.verify_flags
+    context.load_verify_locations('tls-ca-chain.pem')
+    context.load_cert_chain('server.crt', 'server.key')
+    app.run(host='0.0.0.0', port=8081, debug=True,  threaded=True, ssl_context=context)
+```
+
+```bash
+curl -v -H "Host: webhook.esodemoapp2.com" \
+  --cacert webhook_ca.crt \
+  --cert webhook_plugin.crt \
+  --key webhook_plugin.key \
+   https://webhook.esodemoapp2.com:8081/
 ```

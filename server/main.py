@@ -2,7 +2,7 @@
 
 from flask import Flask, request, Response, jsonify, abort
 from functools import wraps
-
+import ssl
 import logging, sys
 import json
 
@@ -98,6 +98,11 @@ def Authorize():
     return jsonify(r)
 
 if __name__ == '__main__':
-    #context = ('server.crt','server.key')
-    #app.run(host='0.0.0.0', port=8081, debug=True,  threaded=True, ssl_context=context)
+    # context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+    # context.verify_mode = ssl.CERT_REQUIRED
+    # context.verify_flags
+    # context.load_verify_locations('tls-ca-chain.pem')
+    # context.load_cert_chain('server.crt', 'server.key')
+    # app.run(host='0.0.0.0', port=8081, debug=True,  threaded=True, ssl_context=context)
+
     app.run(host='0.0.0.0', port=8080, debug=True)
