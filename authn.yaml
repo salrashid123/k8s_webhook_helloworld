@@ -4,10 +4,10 @@ clusters:
   - name: my-authn-service
     cluster:
       # for ngrok
-      # server: https://2723-72-83-67-174.ngrok.io/authenticate
+      server: https://df30-2600-4040-2098-a700-c12-d391-3ae8-35dd.ngrok.io/authenticate
       # for appengine
-      certificate-authority: /var/lib/minikube/certs/gcp_roots.pem
-      server: https://webhook-dot-mineral-minutia-820.appspot.com/authenticate
+      # certificate-authority: /var/lib/minikube/certs/gcp_roots.pem
+      # server: https://webhook-dot-mineral-minutia-820.appspot.com/authenticate
       # for self hosted`
       # certificate-authority: /var/lib/minikube/certs/webhook_ca.crt
       # server: https://webhook.esodemoapp2.com:8081/authenticate

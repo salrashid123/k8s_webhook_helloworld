@@ -1,13 +1,21 @@
 # Kubernetes WebHook Authentication/Authorization Minikube HelloWorld
 
 
-Sample minimal HelloWorld application for Minikube demonstrating [Kubernetes Authentication/Authorization](https://kubernetes.io/docs/admin/kubelet-authentication-authorization/) using Webhooks.
+Sample minimal HelloWorld application for Minikube demonstrating [Kubernetes Authentication/Authorization](https://kubernetes.io/docs/admin/kubelet-authentication-authorization/) as well as [Mutating and Validating AdmissionControl](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/) Webhooks.
 
 Webhooks provide a mechanism for delegating k8s AU/AZ decisions.  In the case here, both policy decisions
 are delegated to an _external_ HTTP REST service which you can test by running locally boomeranged through ngrok.  For more information on WebHooks:
 
 - [WebHook Authentication](https://kubernetes.io/docs/admin/authentication/#webhook-token-authentication)
 - [WebHook Authorization](https://kubernetes.io/docs/admin/authorization/webhook/)
+
+Mutating/Validating Webhooks allows you to modify or reject state changes through an external system
+
+well, just read [What are admission webhooks?](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#what-are-admission-webhooks)
+
+This repo demonstrates both using minikube
+
+---
 
 Wait, why is ngrok involved here?  I thought you said it was all local with minikube?
 
@@ -53,7 +61,7 @@ You can test this locally to if you use a external proxy like [ngrok](https://ng
 1. Download ngrok and run a default http proxy
 
 ```bash
-./ngrok http -host-header=rewrite  localhost:8080
+./ngrok http --host-header=rewrite  https://localhost:8080
 ```
   
   This will assign a random url for you to use for 2hours (the free edition)
@@ -110,56 +118,6 @@ contexts:
   name: webhook
 ```
 
-#### Specify authn/authz definitions
-
-Edit the following files and enter in your `PROJECT_ID`.  
-
-These kubernetes config files signals where to look for the external authn and authz configurations.
-
-It also specifies the certificates to use when contacting GCP
-
-- authn.yaml 
-
-```yaml
-apiVersion: v1
-kind: Config
-clusters:
-  - name: my-authn-service
-    cluster:
-      certificate-authority: /var/lib/minikube/certs/gcp_roots.pem
-      server: https://webhook-dot-mineral-minutia-820.appspot.com/authenticate
-users:
-  - name: my-api-server
-    user:
-      token: test-token
-current-context: webhook
-contexts:
-- context:
-    cluster: my-authn-service
-    user: my-api-sever
-  name: webhook
-```
-
-- authz.yaml 
-```yaml
-apiVersion: v1
-kind: Config
-clusters:
-  - name: my-authz-service
-    cluster:
-      certificate-authority: /var/lib/minikube/certs/gcp_roots.pem
-      server: https://webhook-dot-mineral-minutia-820.appspot.com/authorize
-users:
-  - name: my-api-server
-    user:
-      token: test-token
-current-context: webhook
-contexts:
-- context:
-    cluster: my-authz-service
-    user: my-api-sever
-  name: webhook
-```
 
 ### Start Minikube with custom configuration
 
@@ -199,10 +157,31 @@ to do that simply run
 $ minikube ip
 ```
 
-Then invoke the API server with the k8s server endpoint IP and token using a user's JWT thats HMAC encoded
+Then invoke the API server with the k8s server endpoint IP and token using a user's JWT thats HMAC encoded (the hmackey is just "secret")
 
 * `user1@domain.com`: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InVzZXIxQGRvbWFpbi5jb20ifQ.W0Ek34LU4WQOxXdTqZ9Z-0kESz0wIEdYehxZHlTjt2I`
+
+```json
+{
+  "alg": "HS256",
+  "typ": "JWT"
+}.
+{
+  "username": "user1@domain.com"
+}
+```
+
 * `user2@domain.com`: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InVzZXIyQGRvbWFpbi5jb20ifQ.DTvRw2dBVBOxOyt-Osq2e0iblh_xcbEy-Ir0ZBkkSdY`
+
+```json
+{
+  "alg": "HS256",
+  "typ": "JWT"
+}.
+{
+  "username": "user2@domain.com"
+}
+```
 
 The authorization server is silly: it allows any user to anything *except* user1 to access pods...yeah, it silly but its my example
 
@@ -230,19 +209,8 @@ curl -sk \
 }
 ```
 
-The above bearer JWT is in the form:
-
-```
-{
-  "alg": "HS256",
-  "typ": "JWT"
-}.
-{
-  "username": "user1@domain.com"
-}
-```
-
 As user2 to see pods
+
 ```bash
 curl -sk \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InVzZXIyQGRvbWFpbi5jb20ifQ.DTvRw2dBVBOxOyt-Osq2e0iblh_xcbEy-Ir0ZBkkSdY" \
@@ -273,11 +241,12 @@ If you are using the `ngrok` console, you will see
 * allow:
 
 ![images/authorize_allow.png](images/authorize_allow.png)
+
 ### Calling k8s with kubectl
 
 If you want to use kubectl, you need to configure a context that will use either a  token or basic auth:
 
-For example, the following ```~/.kube/config``` sets up two user contexts that you can use (```webhook1``` and ```webhookd2```)
+For example, the following ```~/.kube/config``` sets up two user contexts that you can use (```webhook1``` and ```webhook2```)
 
 replace the minikube server ip with the value of `minikube ip`
 
@@ -431,20 +400,273 @@ Either way, you should see the Authentication and Authorization requests in the 
     }
 }
 ```
+
+### Mutating Webhook
+
+First off, this code is nothing new...its basically just this: [simple-kubernetes-webhook](https://github.com/slackhq/simple-kubernetes-webhook).
+
+Why am i rewriting it...sometimes i learn by taking something, modifying it and then commit it to a git library...this is all
+
+if you want the canonical example, please see the link above...all i did here is copy
+
+```bash
+./ngrok http --host-header=rewrite  https://localhost:8080
+# edit  webhook.yaml and set the url
+
+## start webhook server
+cd server/
+go run server.go
+
+# start minikube
+minikube stop
+minikube delete
+
+minikube start --driver=kvm2 
+
+kubectl apply -f ns.yaml
+
+kubectl apply -f webhook.yaml
+
+kubectl get mutatingwebhookconfigurations,validatingwebhookconfigurations
+```
+
+
+The server output on apply is something like
+
+```log
+Starting Server..
+received mutation request
+INFO[0443] no lifespan label found, applying default lifespan toleration  min_lifespan=0 mutation=min_lifespan pod_name=offensive-pod
+sending response
+received validation request
+INFO[0443] delete me called                              pod_name=offensive-pod
+sending response
+received mutation request
+INFO[0497] no lifespan label found, applying default lifespan toleration  min_lifespan=0 mutation=min_lifespan pod_name=no-labels
+sending response
+received validation request
+INFO[0497] delete me called                              pod_name=no-labels
+sending response
+received mutation request
+INFO[0605] setting lifespan tolerations                  min_lifespan=3 mutation=min_lifespan pod_name=lifespan-three
+sending response
+received validation request
+INFO[0605] delete me called                              pod_name=lifespan-three
+sending response
+received mutation request
+INFO[0605] setting lifespan tolerations                  min_lifespan=7 mutation=min_lifespan pod_name=lifespan-seven
+sending response
+received validation request
+INFO[0605] delete me called                              pod_name=lifespan-seven
+sending response
+```
+
+so  the mutation and validation can be shown by looking at the pods
+
+```
+$ kubectl get po -n apps 
+NAME             READY   STATUS    RESTARTS   AGE
+lifespan-seven   1/1     Running   0          6s
+lifespan-three   1/1     Running   0          6s
+no-labels        1/1     Running   0          115s
+```
+
+##### `Mutating`
+
+The following will adjust tolerneces and inject an env-var to the pods
+
+- `$ kubectl get po lifespan-three -n apps -oyaml`
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    acme.com/lifespan-requested: "3"          <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+  name: lifespan-three
+  namespace: apps
+spec:
+  containers:
+  - args:
+    - sleep
+    - "3600"
+    env:
+    - name: KUBE       <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+      value: "true"    <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    image: busybox
+    name: lifespan-three
+  nodeName: minikube
+  tolerations:
+  - effect: NoExecute
+    key: node.kubernetes.io/not-ready
+    operator: Exists
+    tolerationSeconds: 300
+  - effect: NoExecute
+    key: node.kubernetes.io/unreachable
+    operator: Exists
+    tolerationSeconds: 300
+  - effect: NoSchedule
+    key: acme.com/lifespan-remaining
+    operator: Equal
+    value: "14"
+  - effect: NoSchedule
+    key: acme.com/lifespan-remaining
+    operator: Equal
+    value: "13"
+  - effect: NoSchedule
+    key: acme.com/lifespan-remaining
+    operator: Equal
+    value: "12"
+  - effect: NoSchedule
+    key: acme.com/lifespan-remaining
+    operator: Equal
+    value: "11"
+  - effect: NoSchedule
+    key: acme.com/lifespan-remaining
+    operator: Equal
+    value: "10"
+  - effect: NoSchedule
+    key: acme.com/lifespan-remaining
+    operator: Equal
+    value: "9"
+  - effect: NoSchedule
+    key: acme.com/lifespan-remaining
+    operator: Equal
+    value: "8"
+  - effect: NoSchedule
+    key: acme.com/lifespan-remaining
+    operator: Equal
+    value: "7"
+  - effect: NoSchedule
+    key: acme.com/lifespan-remaining
+    operator: Equal
+    value: "6"
+  - effect: NoSchedule
+    key: acme.com/lifespan-remaining
+    operator: Equal
+    value: "5"
+  - effect: NoSchedule
+    key: acme.com/lifespan-remaining
+    operator: Equal
+    value: "4"
+  - effect: NoSchedule
+    key: acme.com/lifespan-remaining
+    operator: Equal
+    value: "3"
+```
+
+- `$ kubectl get po lifespan-seven -n apps -oyaml`
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    acme.com/lifespan-requested: "7"
+  name: lifespan-seven
+  namespace: apps
+spec:
+  containers:
+  - args:
+    - sleep
+    - "3600"
+    env:
+    - name: KUBE       <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+      value: "true"    <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    image: busybox
+    name: lifespan-seven
+
+  tolerations:
+  - effect: NoExecute
+    key: node.kubernetes.io/not-ready
+    operator: Exists
+    tolerationSeconds: 300
+  - effect: NoExecute
+    key: node.kubernetes.io/unreachable
+    operator: Exists
+    tolerationSeconds: 300
+  - effect: NoSchedule
+    key: acme.com/lifespan-remaining
+    operator: Equal
+    value: "14"
+  - effect: NoSchedule
+    key: acme.com/lifespan-remaining
+    operator: Equal
+    value: "13"
+  - effect: NoSchedule
+    key: acme.com/lifespan-remaining
+    operator: Equal
+    value: "12"
+  - effect: NoSchedule
+    key: acme.com/lifespan-remaining
+    operator: Equal
+    value: "11"
+  - effect: NoSchedule
+    key: acme.com/lifespan-remaining
+    operator: Equal
+    value: "10"
+  - effect: NoSchedule
+    key: acme.com/lifespan-remaining
+    operator: Equal
+    value: "9"
+  - effect: NoSchedule
+    key: acme.com/lifespan-remaining
+    operator: Equal
+    value: "8"
+  - effect: NoSchedule
+    key: acme.com/lifespan-remaining
+    operator: Equal
+    value: "7"
+```
+
+- `$ kubectl get po no-labels -n apps -oyaml`
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: no-labels
+  namespace: apps
+
+spec:
+  containers:
+  - args:
+    - sleep
+    - "3600"
+    env:
+    - name: KUBE       <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+      value: "true"    <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    image: busybox
+  tolerations:
+  - effect: NoExecute
+    key: node.kubernetes.io/not-ready
+    operator: Exists
+    tolerationSeconds: 300
+  - effect: NoExecute
+    key: node.kubernetes.io/unreachable
+    operator: Exists
+    tolerationSeconds: 300
+  - effect: NoSchedule
+    key: acme.com/lifespan-remaining
+    operator: Exists
+```
+
+
+##### `Validating`
+
+The following will prevent deployment of a pod if a 'bad name" is provided
+
+
+```bash
+$ kubectl apply -f bad-name.pod.yaml
+  Error from server: error when creating "bad-name.pod.yaml": admission webhook "simple-kubernetes-webhook.acme.com" denied the request: pod name contains "offensive"
+```
+
+---
+
+
 ## Appendix
 
-### Creating new users
-
-The sample here used HMAC JWT to create and decode the tokens:
-
-```python
-import jwt
-encoded = jwt.encode({'username': 'user1@domain.com'}, 'secret', algorithm='HS256')
-print encoded
-
-decoded = jwt.decode(encoded, 'secret', algorithms=['HS256'])
-print decoded
-```
 
 ### Testing using mTLS
 

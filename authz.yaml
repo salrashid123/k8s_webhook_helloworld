@@ -4,10 +4,10 @@ clusters:
   - name: my-authz-service
     cluster:
       # for ngrok
-      # server: https://2723-72-83-67-174.ngrok.io/authorize
+      server: https://df30-2600-4040-2098-a700-c12-d391-3ae8-35dd.ngrok.io/authorize
       # for appengine
-      certificate-authority: /var/lib/minikube/certs/gcp_roots.pem
-      server: https://webhook-dot-mineral-minutia-820.appspot.com/authorize
+      # certificate-authority: /var/lib/minikube/certs/gcp_roots.pem
+      # server: https://webhook-dot-mineral-minutia-820.appspot.com/authorize
       # for self hosted
       # certificate-authority: /var/lib/minikube/certs/webhook_ca.crt
       # server: https://webhook.esodemoapp2.com:8081/authorize

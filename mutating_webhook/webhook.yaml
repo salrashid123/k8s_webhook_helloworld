@@ -1,0 +1,41 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: "simple-kubernetes-webhook.acme.com"
+webhooks:
+  - name: "simple-kubernetes-webhook.acme.com"
+    namespaceSelector:
+      matchLabels:
+        admission-webhook: enabled
+    rules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["pods"]
+        scope: "*"
+    clientConfig:
+      url: "https://df30-2600-4040-2098-a700-c12-d391-3ae8-35dd.ngrok.io/mutate"
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    timeoutSeconds: 2
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: "simple-kubernetes-webhook.acme.com"
+webhooks:
+  - name: "simple-kubernetes-webhook.acme.com"
+    namespaceSelector:
+      matchLabels:
+        admission-webhook: enabled
+    rules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["pods"]
+        scope: "*"
+    clientConfig:
+      url: "https://df30-2600-4040-2098-a700-c12-d391-3ae8-35dd.ngrok.io/validate"
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    timeoutSeconds: 2
