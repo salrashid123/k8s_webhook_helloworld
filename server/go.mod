@@ -6,7 +6,7 @@ require (
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/gorilla/mux v1.8.0
 	github.com/sirupsen/logrus v1.9.3
-	golang.org/x/net v0.11.0
+	golang.org/x/net v0.17.0
 	k8s.io/api v0.27.3
 	k8s.io/kubernetes v1.15.0-alpha.0
 )
@@ -23,8 +23,8 @@ require (
 	github.com/salrashid123/k82_webhook_helloworld/server/webhook/admission v0.0.0
 	github.com/salrashid123/k82_webhook_helloworld/server/webhook/mutation v0.0.0 // indirect
 	github.com/salrashid123/k82_webhook_helloworld/server/webhook/validation v0.0.0 // indirect
-	golang.org/x/sys v0.9.0 // indirect
-	golang.org/x/text v0.10.0 // indirect
+	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/text v0.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/apimachinery v0.27.3 // indirect
