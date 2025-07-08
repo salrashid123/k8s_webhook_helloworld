@@ -3,15 +3,12 @@ kind: Config
 clusters:
   - name: my-authn-service
     cluster:
-      # for ngrok
-      server: https://df30-2600-4040-2098-a700-c12-d391-3ae8-35dd.ngrok.io/authenticate
-      # for appengine
-      # certificate-authority: /var/lib/minikube/certs/gcp_roots.pem
-      # server: https://webhook-dot-mineral-minutia-820.appspot.com/authenticate
+      # for cloud run
+      server: https://webhook-server-995081019036.us-central1.run.app/authenticate
       # for self hosted`
       # certificate-authority: /var/lib/minikube/certs/webhook_ca.crt
       # server: https://webhook.esodemoapp2.com:8081/authenticate
-eusers:
+users:
   - name: my-api-server
     user:
       token: test-token

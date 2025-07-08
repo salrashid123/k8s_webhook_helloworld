@@ -284,8 +284,8 @@ func main() {
 	}
 	http2.ConfigureServer(server, &http2.Server{})
 	fmt.Println("Starting Server..")
-	err = server.ListenAndServeTLS("server.crt", "server.key")
-	// err := server.ListenAndServe()
+	//err = server.ListenAndServeTLS("server.crt", "server.key")
+	err = server.ListenAndServe()
 	fmt.Printf("Unable to start Server %v", err)
 
 }

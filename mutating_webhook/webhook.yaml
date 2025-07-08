@@ -14,7 +14,7 @@ webhooks:
         resources: ["pods"]
         scope: "*"
     clientConfig:
-      url: "https://df30-2600-4040-2098-a700-c12-d391-3ae8-35dd.ngrok.io/mutate"
+      url: "https://webhook-server-995081019036.us-central1.run.app/mutate"
     admissionReviewVersions: ["v1"]
     sideEffects: None
     timeoutSeconds: 2
@@ -35,7 +35,7 @@ webhooks:
         resources: ["pods"]
         scope: "*"
     clientConfig:
-      url: "https://df30-2600-4040-2098-a700-c12-d391-3ae8-35dd.ngrok.io/validate"
+      url: "https://webhook-server-995081019036.us-central1.run.app/validate"
     admissionReviewVersions: ["v1"]
     sideEffects: None
     timeoutSeconds: 2

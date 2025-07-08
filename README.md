@@ -13,27 +13,6 @@ Mutating/Validating Webhooks allows you to modify or reject state changes throug
 
 well, just read [What are admission webhooks?](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#what-are-admission-webhooks)
 
-This repo demonstrates both using minikube
-
----
-
-Wait, why is ngrok involved here?  I thought you said it was all local with minikube?
-
-Yeah, i know, i just didn't  know how to make minikube call a url on the host system directly (the host meaning the laptop).
-
-so this is where this becomes lazy and crap:  i make minikube/k8s call an "external" api server with a public ngrok url.  That url is basically a tunnel back to the laptop...
-
-think of it as a boomerang.   If any reader can tell me how to make minikube talk to the local host/system/laptop, let me know
-
-> __Note__: This is just a sample helloworld app; just a demo
-
-besides, its also very old...there are much better examples around..i'd suggest following something lik
-
-* [Kubernetes authentication/authorization webhook using golang in minikube](https://github.com/dinumathai/auth-webhook-sample#)
-- [https://github.com/pasientskyhosting/kubernetes-authserver](https://github.com/pasientskyhosting/kubernetes-authserver)
-
-
-The example is beyond silly.
 
 you have two users, `user1` and `user2` both of how have their own JWT HMAC credentials.
 
@@ -41,36 +20,29 @@ Once this app is deployed, everyone is authorized to access any api endpoint!!!.
 
 i know, silly and arbitrary.
 
+This repo demonstrates both using minikube and the external webhook deployed on GCP Cloud RUn
+
 ---
 
 ## Installation
 
-You can either `A)` deploy the external authn/authz server locally with `ngrok`
+### Deploy with Cloud Run
 
-### Clone the repository
-
-```bash
-git clone https://github.com/salrashid123/k8s_webhook_helloworld
-```
-
-
-### Deploy with ngrok
-
-You can test this locally to if you use a external proxy like [ngrok](https://ngrok.com/).
 
 1. Download ngrok and run a default http proxy
 
 ```bash
-./ngrok http --host-header=rewrite  https://localhost:8080
+git clone https://github.com/salrashid123/k8s_webhook_helloworld
+cd k8s_webhook_helloworld/
+cd server/
+gcloud run deploy webhook-server --source . --region=us-central1 --allow-unauthenticated
+
+
+Service [webhook-server] revision [webhook-server-00003-nz9] has been deployed and is serving 100 percent of traffic.
+Service URL: https://webhook-server-995081019036.us-central1.run.app
 ```
-  
-  This will assign a random url for you to use for 2hours (the free edition)
 
-  In my case it was `https://2723-72-83-67-174.ngrok.io`:
-
-  ![images/ngrok_url.png](images/ngrok_url.png)
-
-  you can view the traffic by going to [http://localhost:4040/inspect/http](http://localhost:4040/inspect/http)
+So i've leved this app running at the url above
 
 2. Set `authn.yaml`, `authz.yaml` to use ngrok
 
@@ -84,7 +56,7 @@ kind: Config
 clusters:
   - name: my-authn-service
     cluster:
-      server: https://2723-72-83-67-174.ngrok.io/authenticate
+      server: https://webhook-server-995081019036.us-central1.run.app/authenticate
 users:
   - name: my-api-server
     user:
@@ -105,7 +77,7 @@ kind: Config
 clusters:
   - name: my-authz-service
     cluster:
-      server: https://2723-72-83-67-174.ngrok.io/authorize      
+      server: https://webhook-server-995081019036.us-central1.run.app/authorize      
 users:
   - name: my-api-server
     user:
@@ -125,14 +97,9 @@ contexts:
 minikube stop
 minikube delete
 
-wget -O gcp_roots.pem https://pki.google.com/roots.pem
-
 mkdir -p $HOME/.minikube/files/var/lib/minikube/certs/auth
 cp authn.yaml $HOME/.minikube/files/var/lib/minikube/certs/auth
 cp authz.yaml $HOME/.minikube/files/var/lib/minikube/certs/auth
-
-cp gcp_roots.pem $HOME/.minikube/files/var/lib/minikube/certs/gcp_roots.pem
-cp certs/webhook_ca.crt $HOME/.minikube/files/var/lib/minikube/certs/webhook_ca.crt
 
 minikube start --driver=kvm2 --embed-certs \
    --extra-config apiserver.authorization-mode=RBAC,Webhook \
@@ -226,7 +193,6 @@ curl -sk \
 }
 ```
 
-If you are using the `ngrok` console, you will see 
 
 * authenticate:
 
@@ -246,7 +212,7 @@ If you are using the `ngrok` console, you will see
 
 If you want to use kubectl, you need to configure a context that will use either a  token or basic auth:
 
-For example, the following ```~/.kube/config``` sets up two user contexts that you can use (```webhook1``` and ```webhook2```)
+For example, the following `~/.kube/config` sets up two user contexts that you can use (`webhook1` and `webhook2`)
 
 replace the minikube server ip with the value of `minikube ip`
 
@@ -255,7 +221,7 @@ apiVersion: v1
 clusters:
 - cluster:
     certificate-authority: /home/srashid/.minikube/ca.crt
-    server: https://192.168.39.37:8443
+    server: https://192.168.39.96:8443
   name: minikube
 contexts:
 - context:
@@ -410,21 +376,11 @@ Why am i rewriting it...sometimes i learn by taking something, modifying it and 
 if you want the canonical example, please see the link above...all i did here is copy
 
 ```bash
-./ngrok http --host-header=rewrite  https://localhost:8080
-# edit  webhook.yaml and set the url
-
-## start webhook server
-cd server/
-go run server.go
-
-# start minikube
 minikube stop
 minikube delete
-
 minikube start --driver=kvm2 
 
 kubectl apply -f ns.yaml
-
 kubectl apply -f webhook.yaml
 
 kubectl get mutatingwebhookconfigurations,validatingwebhookconfigurations
@@ -463,7 +419,17 @@ sending response
 
 so  the mutation and validation can be shown by looking at the pods
 
-```
+```bash
+$ kubectl apply -f .
+    pod/lifespan-seven created
+    pod/lifespan-three created
+    pod/no-labels created
+    namespace/apps unchanged
+    mutatingwebhookconfiguration.admissionregistration.k8s.io/simple-kubernetes-webhook.acme.com unchanged
+    validatingwebhookconfiguration.admissionregistration.k8s.io/simple-kubernetes-webhook.acme.com unchanged
+    Error from server: error when creating "bad-name.pod.yaml": admission webhook "simple-kubernetes-webhook.acme.com" denied the request: pod name contains "offensive"
+
+
 $ kubectl get po -n apps 
 NAME             READY   STATUS    RESTARTS   AGE
 lifespan-seven   1/1     Running   0          6s
@@ -659,53 +625,9 @@ The following will prevent deployment of a pod if a 'bad name" is provided
 
 ```bash
 $ kubectl apply -f bad-name.pod.yaml
+
   Error from server: error when creating "bad-name.pod.yaml": admission webhook "simple-kubernetes-webhook.acme.com" denied the request: pod name contains "offensive"
 ```
 
 ---
 
-
-## Appendix
-
-
-### Testing using mTLS
-
-This is much harder and i've left this out and i've yet to get it to work
-
-The authn and authz configurations _should_ allow mtls from the api server to the external webhook server (i think)
-
-Unfortunately, i haven't gotten it to work yet..you're welcome to try, i think it involves enabling following flags
-
-* mTLS:
-
-```yaml
-      client-certificate: /var/lib/minikube/certs/webhook_plugin.crt
-      client-key: /var/lib/minikube/certs/webhook_plugin.key
-```
-
-When you configure minikube, copy these certs in
-
-```bash
-cp certs/webhook_plugin.crt $HOME/.minikube/files/var/lib/minikube/certs/webhook_plugin.crt
-cp certs/webhook_plugin.key $HOME/.minikube/files/var/lib/minikube/certs/webhook_plugin.key
-```
-
-and in `main.py`.  Note the server certificate i specified there for TLS is `webhook.esodemoapp2.com` which resolves to an IP I (it wont work for you unless you do a lot of tricks with DNS and minikube)
-
-```python
-if __name__ == '__main__':
-    context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
-    context.verify_mode = ssl.CERT_REQUIRED
-    context.verify_flags
-    context.load_verify_locations('tls-ca-chain.pem')
-    context.load_cert_chain('server.crt', 'server.key')
-    app.run(host='0.0.0.0', port=8081, debug=True,  threaded=True, ssl_context=context)
-```
-
-```bash
-curl -v -H "Host: webhook.esodemoapp2.com" \
-  --cacert webhook_ca.crt \
-  --cert webhook_plugin.crt \
-  --key webhook_plugin.key \
-   https://webhook.esodemoapp2.com:8081/
-```
